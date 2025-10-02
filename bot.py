@@ -36,7 +36,7 @@ async def set_custom_reminder(update, context: ContextTypes.DEFAULT_TYPE):
     
     # Finalización: Hoy a las 12:00 PM (mediodía)
     today_date = datetime.now().date()
-    end_datetime = datetime.combine(today_date, time(12, 0))
+    end_datetime = datetime.combine(today_date, time(22, 0)) # 22:00 (10 PM)
 
     # Nombre único para el trabajo (usa el chat_id y el timestamp para evitar conflictos)
     job_name = f"custom_reminder_{update.effective_chat.id}_{datetime.now().timestamp()}"
