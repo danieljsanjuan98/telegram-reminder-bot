@@ -44,7 +44,7 @@ async def set_custom_reminder(update, context: ContextTypes.DEFAULT_TYPE):
     # 3. Verificamos que la hora de finalización no haya pasado
     if end_datetime < datetime.now():
         await update.message.reply_text(
-            "⚠️ La hora de finalización (12:00 PM) ya pasó hoy. Intenta con un /recordar después de medianoche."
+            "⚠️ La hora de finalización (10:00 PM) ya pasó hoy. Intenta con un /recordar después de medianoche."
         )
         return
     
@@ -64,7 +64,7 @@ async def set_custom_reminder(update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ Recordatorio configurado.\n"
         f"**Mensaje:** {reminder_text}\n"
         f"**Frecuencia:** Cada 10 minutos.\n"
-        f"**Finaliza:** Hoy a las 12:00 PM (mediodía)."
+        f"**Finaliza:** Hoy a las 10:00 PM."
     )
 
 async def cancel_custom_reminders(update, context: ContextTypes.DEFAULT_TYPE):
