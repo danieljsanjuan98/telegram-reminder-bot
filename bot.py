@@ -1,6 +1,9 @@
 import os
-from datetime import time, timedelta
+from datetime import time, timedelta, datetime
 from telegram.ext import Application, CommandHandler, ContextTypes
+
+# ⚠️ Tu Chat ID para los recordatorios fijos
+MY_CHAT_ID = 5776381212 
 
 # ⚠️ El token lo sacamos de las variables de entorno
 TOKEN = os.getenv("TOKEN")
@@ -9,11 +12,82 @@ TOKEN = os.getenv("TOKEN")
 async def start(update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Hola! Soy tu bot recordatorio.\n"
-        "📌 Tengo 3 recordatorios activos todos los días de 8am a 8pm."
+        "📌 Tengo 3 recordatorios activos todos los días de 8am a 8pm.\n"
+        "⚡ Usa /recordar [tu mensaje] para añadir un recordatorio temporal."
     )
 
 async def stop(update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🛑 Bot detenido (aunque en Railway seguirá en ejecución).")
+
+
+# ---- Recordatorios Personalizados ----
+
+async def set_custom_reminder(update, context: ContextTypes.DEFAULT_TYPE):
+    # 1. Verificar si el usuario escribió un mensaje
+    if not context.args:
+        await update.message.reply_text(
+            "Por favor, usa el formato: /recordar [tu mensaje]. Ejemplo: /recordar comprar cartulina"
+        )
+        return
+
+    # 2. Extraer el mensaje del recordatorio y definir la finalización
+    reminder_text = " ".join(context.args)
+    interval = timedelta(minutes=10)
+    
+    # Finalización: Hoy a las 12:00 PM (mediodía)
+    today_date = datetime.now().date()
+    end_datetime = datetime.combine(today_date, time(12, 0))
+
+    # Nombre único para el trabajo (usa el chat_id y el timestamp para evitar conflictos)
+    job_name = f"custom_reminder_{update.effective_chat.id}_{datetime.now().timestamp()}"
+
+    # 3. Verificamos que la hora de finalización no haya pasado
+    if end_datetime < datetime.now():
+        await update.message.reply_text(
+            "⚠️ La hora de finalización (12:00 PM) ya pasó hoy. Intenta con un /recordar después de medianoche."
+        )
+        return
+    
+    # 4. Programar el trabajo recurrente
+    context.job_queue.run_repeating(
+        lambda ctx: ctx.bot.send_message(
+            ctx.job.chat_id, 
+            f"🚨 **RECORDATORIO CADA 10 MINUTOS:** {reminder_text}"
+        ),
+        interval=interval,
+        last=end_datetime,
+        chat_id=update.effective_chat.id,
+        name=job_name,
+    )
+
+    await update.message.reply_text(
+        f"✅ Recordatorio configurado.\n"
+        f"**Mensaje:** {reminder_text}\n"
+        f"**Frecuencia:** Cada 10 minutos.\n"
+        f"**Finaliza:** Hoy a las 12:00 PM (mediodía)."
+    )
+
+async def cancel_custom_reminders(update, context: ContextTypes.DEFAULT_TYPE):
+    # Obtener todos los trabajos (jobs) del chat actual
+    jobs = context.job_queue.get_jobs_by_chat_id(update.effective_chat.id)
+    
+    # Filtrar solo los trabajos personalizados (los que contienen "custom_reminder")
+    custom_jobs_cancelled = 0
+    
+    for job in jobs:
+        if job.name and "custom_reminder" in job.name:
+            job.schedule_removal()
+            custom_jobs_cancelled += 1
+
+    if custom_jobs_cancelled > 0:
+        await update.message.reply_text(
+            f"🛑 Se cancelaron **{custom_jobs_cancelled}** recordatorios temporales (los creados con /recordar)."
+        )
+    else:
+        await update.message.reply_text(
+            "ℹ️ No se encontraron recordatorios temporales activos para cancelar."
+        )
+
 
 # ---- Main ----
 def main():
@@ -22,14 +96,21 @@ def main():
     # Comandos
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stop", stop))
+    # Nuevos comandos de recordatorio
+    app.add_handler(CommandHandler("recordar", set_custom_reminder))
+    app.add_handler(CommandHandler("cancelar", cancel_custom_reminders))
 
-    # Recordatorios diarios entre 8am y 8pm
+
+    # Recordatorios diarios entre 8am y 8pm (CORREGIDO: Incluye MY_CHAT_ID)
+    
     # 1) Cada 30 minutos
     app.job_queue.run_repeating(
         lambda ctx: ctx.bot.send_message(ctx.job.chat_id, "📝 Ya anotaste lo que tienes que hacer?"),
         interval=timedelta(minutes=30),
         first=time(8, 0),
         last=time(20, 0),
+        chat_id=MY_CHAT_ID, # 👈 CHAT ID AÑADIDO
+        name="daily_30min",
     )
 
     # 2) Cada 40 minutos
@@ -38,6 +119,8 @@ def main():
         interval=timedelta(minutes=40),
         first=time(8, 0),
         last=time(20, 0),
+        chat_id=MY_CHAT_ID, # 👈 CHAT ID AÑADIDO
+        name="daily_40min",
     )
 
     # 3) Cada 1 hora
@@ -46,6 +129,8 @@ def main():
         interval=timedelta(hours=1),
         first=time(8, 0),
         last=time(20, 0),
+        chat_id=MY_CHAT_ID, # 👈 CHAT ID AÑADIDO
+        name="daily_1hr",
     )
 
     print("🤖 Bot corriendo en Railway...")
