@@ -34,16 +34,17 @@ async def set_custom_reminder(update, context: ContextTypes.DEFAULT_TYPE):
     reminder_text = " ".join(context.args)
     interval = timedelta(minutes=10)
     
-    # Finalización: Hoy a las 12:00 PM (mediodía)
+    # Finalización: Hoy a las 10:00 PM (22:00)
     today_date = datetime.now().date()
-    end_datetime = datetime.combine(today_date, time(22, 0)) # 22:00 (10 PM)
+    end_datetime = datetime.combine(today_date, time(22, 0))
 
-    # Nombre único para el trabajo (usa el chat_id y el timestamp para evitar conflictos)
-    job_name = f"custom_reminder_{update.effective_chat.id}_{datetime.now().timestamp()}"
+    # Nombre único para el trabajo. Usamos el chat_id como prefijo para que /cancelar lo encuentre.
+    job_name = f"custom_reminder_active_{update.effective_chat.id}_{datetime.now().timestamp()}"
 
     # 3. Verificamos que la hora de finalización no haya pasado
     if end_datetime < datetime.now():
         await update.message.reply_text(
+            # ✅ CORRECCIÓN 1: Mensaje de error de hora.
             "⚠️ La hora de finalización (10:00 PM) ya pasó hoy. Intenta con un /recordar después de medianoche."
         )
         return
@@ -64,18 +65,21 @@ async def set_custom_reminder(update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ Recordatorio configurado.\n"
         f"**Mensaje:** {reminder_text}\n"
         f"**Frecuencia:** Cada 10 minutos.\n"
-        f"**Finaliza:** Hoy a las 10:00 PM."
+        # ✅ CORRECCIÓN 2: Mensaje de confirmación de hora.
+        f"**Finaliza:** Hoy a las 22:00 (10 PM)." 
     )
 
 async def cancel_custom_reminders(update, context: ContextTypes.DEFAULT_TYPE):
-    # Obtener todos los trabajos (jobs) del chat actual
-    jobs = context.job_queue.get_jobs_by_chat_id(update.effective_chat.id)
+    chat_id = update.effective_chat.id
     
-    # Filtrar solo los trabajos personalizados (los que contienen "custom_reminder")
+    # ✅ CORRECCIÓN 3: Reemplazamos get_jobs_by_chat_id (obsoleto) por jobs() y filtramos manualmente.
+    all_jobs = context.job_queue.jobs()
     custom_jobs_cancelled = 0
     
-    for job in jobs:
-        if job.name and "custom_reminder" in job.name:
+    for job in all_jobs:
+        # Verificamos si es un recordatorio personalizado para este chat
+        expected_name_prefix = f"custom_reminder_active_{chat_id}"
+        if job.name and job.name.startswith(expected_name_prefix):
             job.schedule_removal()
             custom_jobs_cancelled += 1
 
